@@ -1,0 +1,375 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+using FirebirdSql.Data.Client;
+using System.Data;
+using System.Collections.ObjectModel;
+using MyAdminCfdi15.Models;
+
+namespace MyAdminCfdi15
+{
+    public partial class Inventario : WindowBase
+    {
+        ObservableCollection<ListaInventario> lstinv = new ObservableCollection<ListaInventario>();
+        Grid[] grdarr;
+        DataTable dtSCT = new DataTable();
+        
+        public Inventario()
+        {
+            InitializeComponent();
+            Personalizar(cctHeader, "Inventario", "#FFD14524"); //Heredado de WindowBase
+            #region Eventos Heredados
+            //btnX.Click += btnX_Click;
+            //rngBarra.MouseLeftButtonDown += rngBarra_MouseLeftButtonDown;
+            Editado = false;
+            #endregion
+            
+            grdarr = new Grid[] { grdDatosGenerales };
+            //txtarr = new TextBox[]
+            //{
+            //    _2txtART_PRECIO1decNUM,
+            //    _2txtART_PRECIO2decNUM,
+            //    _2txtART_PRECIO3decNUM,
+            //    txtART_PRECIO1,
+            //    txtART_PRECIO2,
+            //    txtART_PRECIO3
+            //};
+            _1lsvINV_IDintNUM.ItemsSource = lstinv;
+            _1lsvINV_IDintNUM.SelectedValuePath = "ID";
+            Deshabilitar();
+
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            Guardado = false;
+            if (dbc.Conectar())
+            {
+                CargarLista();
+       
+            }
+            else
+                this.Close();
+        }
+
+        private void CargarLista()
+        {
+            try
+            {
+                string buscar;
+                if (txtSearch.Text.Trim() == "Buscar...") buscar = "";
+                else buscar = txtSearch.Text.Trim();
+
+                string query = "SELECT ART_ID, ART_DESCRIP, ART_CODIGO, ART_COSTO " +
+                               "FROM ARTICULOS " +
+                               "WHERE ART_DESCRIP LIKE '%" + buscar + "%' OR " +
+                               "ART_CODIGO LIKE '%" + buscar + "%' " +
+                               "ORDER BY ART_DESCRIP ASC";
+                string query2 = "SELECT T1.INV_ID, T1.ART_ID AS AI_ID , T1.INV_UNIDADES AS INV_UNIDAD "+
+                                " FROM INVENTARIO T1"+
+                                " INNER JOIN ARTICULOS T2 " +
+                                " ON T1.ART_ID = T2.ART_ID";
+                string unidades = "0";
+                DataTable dt = new DataTable();
+                DataTable dt2 = new DataTable();
+                
+                lstinv.Clear();
+                dbc.IniciarTransaccion();
+
+                int rows = dbc.ConsultarT(query, dt);
+                int rows2= dbc.ConsultarT(query2,dt2);
+                if (rows >= 0)
+                {
+                    if (rows2 == 0)
+                    {
+                        for (int i = 0; i < dt.Rows.Count; i++)
+                    {
+                        
+                            lstinv.Add(new ListaInventario
+                            {
+                                ID_ART = Convert.ToInt32(dt.Rows[i]["ART_ID"]),
+                                Codigo = dt.Rows[i]["ART_CODIGO"].ToString(),
+                                Descripcion = dt.Rows[i]["ART_DESCRIP"].ToString(),
+                                Unidades = unidades,
+                                Costo = dt.Rows[i]["ART_COSTO"].ToString(),
+                            });
+                        }
+                        dbc.Commit();
+                    }
+                    else
+                    {
+                        for (int i = 0; i < dt.Rows.Count; i++)
+                        {
+
+                            lstinv.Add(new ListaInventario
+                            {
+                                ID_INV= Convert.ToInt32(dt.Rows[i]["AI_ID"]),
+                                ID_ART = Convert.ToInt32(dt.Rows[i]["ART_ID"]),
+                                Codigo = dt.Rows[i]["ART_CODIGO"].ToString(),
+                                Descripcion = dt.Rows[i]["ART_DESCRIP"].ToString(),
+                                Unidades = dt.Rows[i]["INV_UNIDAD"].ToString(),
+                                Costo = dt.Rows[i]["ART_COSTO"].ToString(),
+                            });
+                        }
+                        dbc.Commit();
+
+                    }
+                }
+                else
+                    dbc.Rollback();
+
+                //if (rows2 != 0)
+                //{
+                //    for (int i = 0; i < dt2.Rows.Count; i++)
+                //    {
+                //        lstinv.Add(new ListaInventario
+                //        {
+                //            ID_INV = Convert.ToInt32(dt2.Rows[i]["AI_ID"]),
+                //            Unidades= dt2.Rows[i]["INV_UNI"].ToString(),
+                //        });
+                //    }
+                ////    dbc.Commit();
+                ////}
+                ////else
+                //if (rows == 0)
+                //{
+                //    for (int i = 0; i < dt2.Rows.Count; i++)
+                //    {
+                //        lstinv.Add(new ListaInventario
+                //        {
+                //            ID_INV = Convert.ToInt32(dt2.Rows[i]["AI_ID"]),
+                //            Unidades = "0",
+                //        });
+                //    }
+                //    dbc.Commit();
+                //    MessageBox.Show("null");
+                //}
+                //else
+                //    dbc.Rollback();
+
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ocurrio un problema al cargar la lista.\nError: " + ex.Message);
+            }
+        }
+
+       
+        private void txtSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            CargarLista();
+        }
+
+        private void Habilitar()
+        {
+            grdDatosGenerales.IsEnabled = true;
+            Controles.DefinirColor(grdarr, "#FF000000");
+        }
+
+        private void Deshabilitar()
+        {
+            grdDatosGenerales.IsEnabled = false;
+            Controles.DefinirColor(grdarr, "#FF6D6D6D");
+        }
+
+        private void _1lsvINV_IDintNUM_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            Elegir();
+        }
+
+        private void Elegir()
+        {
+            try
+            {
+                //int selec = _1lsvINV_IDintNUM.SelectedIndex;
+                //if (selec > -1)
+                //{
+                //    if (selec == 0)
+                //        _2txtINV_CODIGOstrSTR.IsReadOnly = false;
+                //    else
+                      //_2txtINV_CODIGOstrSTR.IsReadOnly = true;
+
+                //    dbc.IniciarTransaccion();
+
+                //    if (lstart[selec].ID == 0)
+                //    {
+                //        Habilitar();
+                //        chkEditar.IsEnabled = false;
+                //        btnGuardar.IsEnabled = true;
+                //        btnCancelar.IsEnabled = true;
+                //        grdBusqueda.IsEnabled = false;
+                //        grdDatos.IsEnabled = true;
+                //    }
+                //    else
+                //    { 
+                        Deshabilitar();
+                        CargarDatos();
+                        
+                  //  }
+                    
+               // }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ocurrió un problema con la selección.\nError: " + ex.Message);
+            }
+        }
+
+        private void CargarDatos()
+        {
+            int selec = _1lsvINV_IDintNUM.SelectedIndex;
+            //MessageBox.Show(lstart[selec].ID.ToString());
+            CodigoTX.IsReadOnly = true;
+            CostoTX.IsReadOnly = true;
+            DescripcionTX.IsReadOnly = true;
+            CodigoTX.Text = lstinv[selec].Codigo;
+            DescripcionTX.Text = lstinv[selec].Descripcion;
+            UnidadesTX.Text = lstinv[selec].Unidades;
+            CostoTX.Text = lstinv[selec].Costo;
+            chkEditar.IsEnabled = true;
+            btnGuardar.IsEnabled = false;
+            btnCancelar.IsEnabled = true;
+            grdBusqueda.IsEnabled = false;
+            grdDatos.IsEnabled = true;
+            //try
+            //{
+            //    int selec = _1lsvINV_IDintNUM.SelectedIndex;
+            //    string query = "SELECT * FROM ARTICULOS " +
+            //                   "WHERE ART_ID = " + lstart[selec].ID + " FOR UPDATE WITH LOCK";
+            //    DataTable dt = new DataTable();
+
+            //    int rows = dbc.ConsultarT(query, dt);
+            //    if (rows >= 0)
+            //    {
+            //        int i = 1;
+            //        i = Controles.CargarControl(grdarr, i, dt);
+            //        chkEditar.IsEnabled = true;
+            //        btnGuardar.IsEnabled = false;
+            //        btnCancelar.IsEnabled = true;
+            //        grdBusqueda.IsEnabled = false;
+            //        grdDatos.IsEnabled = true;
+            //    }
+            //    else
+            //    {
+            //        dbc.Rollback();
+            //        string id = _1lsvINV_IDintNUM.SelectedValue.ToString();
+            //        CargarLista();
+            //        _1lsvINV_IDintNUM.SelectedValue = id;
+            //    }
+            //}
+            //catch (Exception ex)
+            //{
+            //    MessageBox.Show("Ocurrió un error al cargar los datos.\nError: " + ex.Message);
+            //}
+
+
+        }
+
+
+
+        private void chkEditar_Checked(object sender, RoutedEventArgs e)
+        {
+            Habilitar();
+            Controles.ValidarObligatorios(grdDatos);
+            btnGuardar.IsEnabled = true;
+            Editado = true;
+        }
+
+        private void chkEditar_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Deshabilitar();
+            btnGuardar.IsEnabled = false;
+            Editado = false;
+        }
+
+        private void btnCancelar_Click(object sender, RoutedEventArgs e)
+        {
+            CodigoTX.Clear();
+            DescripcionTX.Clear();
+            CostoTX.Clear();
+            UnidadesTX.Clear();
+            //Controles.LimpiarControles(grdarr);
+            //Deshabilitar();
+            chkEditar.IsChecked = false;
+            grdBusqueda.IsEnabled = true;
+            grdDatos.IsEnabled = false;
+            //_1lsvINV_IDintNUM.Focus();
+            //tbcDatos.SelectedIndex = 0;
+            //dbc.Rollback();
+            //string id = _1lsvINV_IDintNUM.SelectedValue.ToString();
+            //CargarLista();
+            //_1lsvINV_IDintNUM.SelectedValue = id;
+
+        }
+
+        private void _1lsvINV_IDintNUM_KeyDown(object sender, KeyEventArgs e)
+        {
+
+            switch (e.Key)
+            {
+                case Key.Enter:
+                    Elegir();
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private void btnGuardar_Click(object sender, RoutedEventArgs e)
+        {
+            if (Controles.ValidarObligatorios(grdarr))
+            {
+                if (Controles.ValidarDecimales(grdarr))
+                {
+                    List<ListaValores> lstval = new List<ListaValores>();
+                    lstval = Controles.ExtraerDatos(grdBusqueda, lstval);
+                    lstval = Controles.ExtraerDatos(grdarr, lstval);
+                    int id = 0;
+                    bool iscommitted = false;
+                    if (chkEditar.IsChecked == true)
+                    {
+                        if (dbc.ActualizarT("ARTICULOS", lstval))
+                        {
+                            id = Convert.ToInt32(_1lsvINV_IDintNUM.SelectedValue);
+                            chkEditar.IsChecked = false;
+                            dbc.Commit();
+                            iscommitted = true;
+                        }
+                    }
+                    else
+                    {
+                        id = dbc.InsertarT("ARTICULOS", lstval);
+                        if (id != 0)
+                        {
+                            dbc.Commit();
+                            iscommitted = true;
+                        }
+                    }
+                    if (iscommitted)
+                    {
+                        Guardado = true;
+                        CargarLista();
+                        _1lsvINV_IDintNUM.SelectedValue = id.ToString();
+                        Elegir();
+                    }
+                    
+                }
+                else
+                    MessageBox.Show("Uno o varios de los campos numéricos contienen caracteres no permitidos,\nfavor de verificar sus datos.");
+            }
+            else
+                MessageBox.Show("Uno o varios de los campos obligatorios estan vacíos,\nfavor de verificar sus datos.");
+        }
+     
+    }
+
+}
